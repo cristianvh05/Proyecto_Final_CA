@@ -1,4 +1,4 @@
-{
+docker ps{
   "tipo": "SARIMAX (statsmodels)",
   "order": [
     1,
@@ -16,32 +16,32 @@
   "enforce_invertibility": false,
   "freq": "h",
   "params": {
-    "ar.L1": 0.5032022883352258,
-    "ma.L1": -0.1556429941638335,
-    "ma.L2": 0.05859351618217142,
-    "ma.S.L24": -1.0000171380413136,
-    "sigma2": 4864.073332616762
+    "ar.L1": 0.4335624016525599,
+    "ma.L1": -0.08719825716162341,
+    "ma.L2": 0.07628073718920046,
+    "ma.S.L24": -1.0000436537813582,
+    "sigma2": 4994.955387731443
   },
   "measurement": "Server",
   "field": "Consumo_total",
   "tag": null,
   "n_observaciones": 720,
   "rango_entrenamiento": {
-    "inicio": "2026-10-24 03:00:00",
-    "fin": "2026-11-23 02:00:00"
+    "inicio": "2026-10-25 20:00:00",
+    "fin": "2026-11-24 19:00:00"
   },
   "metricas_test": {
-    "MAE": 40.7474,
-    "RMSE": 50.7658,
-    "MAPE_%": 14.7492
+    "MAE": 57.0992,
+    "RMSE": 84.7692,
+    "MAPE_%": 17.9492
   },
   "metricas_ingenua": {
-    "MAE": 64.4374,
-    "RMSE": 91.6455,
-    "MAPE_%": 25.2916
+    "MAE": 58.1551,
+    "RMSE": 83.2935,
+    "MAPE_%": 18.4067
   },
-  "aic": 7652.956108865121,
-  "entrenado_en": "2026-11-23 03:20 UTC",
+  "aic": 7670.729225329513,
+  "entrenado_en": "2026-11-24 20:55 UTC",
   "versiones": {
     "statsmodels": "0.15.0",
     "pandas": "2.2.3",
