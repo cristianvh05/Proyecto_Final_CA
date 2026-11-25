@@ -1,334 +1,210 @@
-# Proyecto final · Pronóstico de series de tiempo en producción
+# Proyecto final — Pronóstico de consumo eléctrico con SARIMA
+
+**Computación Avanzada (ET0197) · Institución Universitaria Pascual Bravo**
 
 ## Video de sustentación
 
-**Presentación del proyecto:** [Ver video de sustentación en YouTube](https://youtu.be/HRkBc9Et_hk)
+**[Ver demostración del proyecto en YouTube](https://youtu.be/HRkBc9Et_hk)**
 
-**Computación Avanzada — Cierre del curso**
+El video presenta la aplicación con datos reales, la ejecución sin Docker y su funcionamiento dentro de un contenedor Docker.
 
-Vas a construir un servicio web que pronostica las próximas horas de una variable medida por sensores. Los datos vienen de **InfluxDB**, el modelo es un **SARIMA** que tú entrenas en **Google Colab**, la API está hecha en **FastAPI** y todo corre en **GitHub Codespaces**. Al final lo empaquetas en un **contenedor Docker**.
+## Descripción del proyecto
 
-## Qué recibes y qué construyes
+Este proyecto implementa una aplicación web que consulta registros históricos de consumo eléctrico almacenados en **InfluxDB**, genera pronósticos horarios mediante un modelo **SARIMA** entrenado en **Google Colab** y presenta los resultados en un dashboard interactivo.
 
-La API ya está hecha: consulta InfluxDB, carga tu modelo y entrega el pronóstico en JSON. **No necesitas modificarla.** Tú construyes las tres piezas que la convierten en un servicio completo:
+La API está desarrollada con **FastAPI** y se ejecuta en **GitHub Codespaces**, tanto directamente con Uvicorn como dentro de un contenedor **Docker**. El proyecto utiliza como punto de partida la plantilla y la API proporcionadas en el curso; sobre esa base se configuró la fuente de datos, se entrenó y exportó el modelo, se desarrolló la interfaz gráfica y se preparó la contenerización.
 
-| Pieza | ¿Quién la hace? |
+## Tecnologías utilizadas
+
+- **Python, Pandas, NumPy y Statsmodels:** tratamiento de la serie temporal y entrenamiento SARIMA.
+- **InfluxDB 2.x:** almacenamiento y consulta de mediciones históricas.
+- **Google Colab:** análisis, evaluación y exportación del modelo.
+- **FastAPI y Uvicorn:** servicio web y endpoints de pronóstico.
+- **HTML, CSS, JavaScript y Chart.js:** dashboard, gráfica y controles.
+- **GitHub Codespaces:** entorno de desarrollo y ejecución.
+- **Docker:** empaquetado y ejecución de la aplicación en un contenedor.
+
+## Datos y entrenamiento del modelo
+
+| Elemento | Configuración |
 |---|---|
-| Entorno del Codespace (`.devcontainer/`) | ✅ Viene lista |
-| API (`app/`) | ✅ Viene lista |
-| Notebook de entrenamiento (`notebooks/`) | ✅ Viene listo, **tú lo adaptas a tu serie** |
-| **Modelo** (`models/sarima_config.json`) | ✏️ **Tú lo entrenas** (Fase 1) |
-| **Frontend** (`frontend/index.html`) | ✏️ **Tú lo diseñas** a partir de un esqueleto (Fase 2) |
-| **Contenedor** (`Dockerfile`, `.dockerignore`) | ✏️ **Tú lo escribes** (Fase 4) |
+| Bucket de InfluxDB | `Consumo_elec` |
+| Measurement | `Server` |
+| Field | `Consumo_total` |
+| Observaciones del entrenamiento final | 720 horas |
+| Modelo seleccionado | SARIMA(1, 0, 2) × (0, 1, 1, 24) |
+| Estacionalidad | 24 horas |
+| Archivo exportado | `models/sarima_config.json` |
 
-| Fase | Dónde | Qué haces | Pregunta que responde |
-|---|---|---|---|
-| 0 | GitHub | Crear tu repo, abrir el Codespace, guardar credenciales | — |
-| 1 | Colab | Entrenar tu modelo SARIMA | ¿Qué modelo describe mi serie? |
-| 2 | Codespaces | Diseñar tu frontend | ¿Cómo lo ve un usuario? |
-| 3 | Codespaces | Ejecutar el servicio completo **sin Docker** | ¿Funciona mi código? |
-| 4 | Codespaces | Ejecutar el servicio **dentro de un contenedor** | ¿Funciona mi contenedor? |
+En el notebook `notebooks/entrenamiento_sarima_colab.ipynb` se realizó la consulta de datos, el análisis de estacionalidad, el tratamiento de valores extremos, la selección de órdenes y la evaluación del modelo sobre las últimas 24 horas reservadas para prueba.
 
-> Las fases 1 y 2 son independientes: en un equipo, una persona puede entrenar el modelo mientras otra diseña el frontend.
+### Resultados de evaluación del entrenamiento final
+
+| Métrica | SARIMA | Línea base ingenua estacional |
+|---|---:|---:|
+| MAE | **57.0992** | 58.1551 |
+| RMSE | 84.7692 | **83.2935** |
+| MAPE | **17.9492 %** | 18.4067 % |
+
+SARIMA obtuvo menor error en **MAE** y **MAPE**; la línea base obtuvo menor **RMSE**. Por tanto, el resultado no representa una mejora uniforme en todas las métricas.
+
+La prueba de reproducción del modelo en Colab devolvió:
+
+```text
+Diferencia máxima API vs. modelo original: 0.0
+```
+
+Esta prueba compara 12 pronósticos del modelo original con los de la reconstrucción realizada a partir de los parámetros exportados en JSON, sin reentrenarlos.
+
+> La fuente contiene mediciones denominadas `Consumo_total`; la unidad física y el dispositivo de adquisición no se especifican en este repositorio. No se deben interpretar los valores como kWh, kW u otra unidad sin esa confirmación.
+
+## Funcionalidades del dashboard
+
+La interfaz `frontend/index.html` permite:
+
+- Visualizar los valores históricos y los pronósticos en una gráfica interactiva.
+- Mostrar una banda de **intervalo de confianza del 95 %**.
+- Presentar las fechas y horas en la zona **America/Bogota**.
+- Consultar indicadores: próxima hora pronosticada, máximo estimado y última observación real.
+- Elegir el horizonte de pronóstico (6, 12, 24 o 48 horas) y el histórico visible (24, 48 o 72 horas).
+- Consultar una tabla con los valores pronosticados y sus límites.
+- Mostrar mensajes de error cuando la API no devuelve una respuesta válida o no se puede completar la consulta.
 
 ## Estructura del repositorio
 
-```
-.
-├── .devcontainer/devcontainer.json   ← máquina del Codespace (Python + Docker)
-├── app/                              ← la API (no la modifiques)
-│   ├── main.py                       ← endpoints y servidor del frontend
-│   ├── config.py                     ← lee las variables de entorno
-│   ├── influx.py                     ← consulta InfluxDB y arma la serie horaria
-│   └── model.py                      ← carga tu modelo y pronostica
+```text
+Proyecto_Final_CA/
+├── .devcontainer/
+├── app/
+│   ├── main.py                # Endpoints y servidor FastAPI
+│   ├── config.py              # Configuración desde variables de entorno
+│   ├── influx.py              # Consultas a InfluxDB
+│   └── model.py               # Carga y uso del modelo SARIMA
 ├── frontend/
-│   └── index.html                    ← ESQUELETO: lo conviertes en tu interfaz (Fase 2)
-├── models/                           ← aquí va TU sarima_config.json (Fase 1)
+│   └── index.html             # Dashboard interactivo
+├── models/
+│   └── sarima_config.json     # Parámetros del modelo entrenado
 ├── notebooks/
 │   └── entrenamiento_sarima_colab.ipynb
 ├── scripts/
-│   ├── probar_conexion.py            ← muestra qué hay en tu bucket
-│   └── crear_modelo_demo.py          ← modelo de prueba para trabajar sin datos reales
-├── pruebas.http                      ← peticiones de prueba a la API
+│   ├── probar_conexion.py
+│   └── crear_modelo_demo.py
+├── Dockerfile
+├── .dockerignore
+├── .env.example
 ├── requirements.txt
-└── .env.example
+└── README.md
 ```
 
----
+## Configuración de la conexión a InfluxDB
 
-## Fase 0 — Preparar tu repositorio
+Las credenciales **no se almacenan en el repositorio ni se copian dentro de la imagen Docker**. Se configuran mediante *Codespaces secrets* o variables de entorno:
 
-### 0.1 Crea tu copia y abre el Codespace
-
-1. En la página de este repositorio: **Use this template → Create a new repository**, en **tu** cuenta.
-2. En tu repositorio: **Code → Codespaces → Create codespace on main**. La primera vez tarda unos minutos.
-
-### 0.2 Guarda las credenciales de InfluxDB
-
-El profesor te entrega la URL, el token, la org y el bucket. **El token nunca va en el código.**
-
-1. En tu repositorio: **Settings → Secrets and variables → Codespaces → New repository secret**.
-2. Crea los cuatro: `INFLUX_URL`, `INFLUX_TOKEN`, `INFLUX_ORG` e `INFLUX_BUCKET`.
-3. En el Codespace aparecerá un aviso para recargar: **Reload**. Si no aparece: `F1` → **Codespaces: Rebuild Container**.
-
-### 0.3 Verifica
-
-En la terminal del Codespace:
-
-```bash
-python --version
-docker --version
-echo ${#INFLUX_TOKEN}
-python scripts/probar_conexion.py
-```
-
-`echo ${#INFLUX_TOKEN}` muestra cuántos caracteres tiene el token sin mostrarlo. El último comando lista los **measurements** del bucket. Para ver los **fields** de uno de ellos:
-
-```bash
-INFLUX_MEASUREMENT=nombre_del_measurement python scripts/probar_conexion.py
-```
-
-Anota el measurement y el field de **tu** serie: los necesitas en la Fase 1.
-
-**✅ Checklist Fase 0**
-- [ ] La terminal no muestra el mensaje *recovery mode*.
-- [ ] `docker --version` responde.
-- [ ] `echo ${#INFLUX_TOKEN}` da un número mayor que 0.
-- [ ] `probar_conexion.py` muestra `Ping: OK` y conoces tu measurement y tu field.
-
----
-
-## Fase 1 — Tu modelo (Colab)
-
-1. En Colab: **Archivo → Abrir notebook → pestaña GitHub** → tu repositorio → `notebooks/entrenamiento_sarima_colab.ipynb`.
-2. En **Secrets** (🔑) crea `INFLUX_URL`, `INFLUX_TOKEN`, `INFLUX_ORG` e `INFLUX_BUCKET`, y activa **Acceso al notebook** en cada uno.
-3. En la celda **0. Configuración** escribe tu `MEASUREMENT` y tu `FIELD`.
-4. Ejecuta las celdas **en orden**, una por una, y lee lo que muestra cada una. El notebook elige solo el mejor modelo.
-5. Descarga `sarima_config.json` (sección 6, opción A), arrástralo a la carpeta `models/` del Codespace y súbelo:
-
-   ```bash
-   git add models/sarima_config.json
-   git commit -m "Modelo SARIMA entrenado en Colab"
-   git push
-   ```
-
-6. Guarda el notebook ejecutado en tu repo: en Colab, **Archivo → Guardar una copia en GitHub** → carpeta `notebooks/`.
-
-> **Recuerda:** InfluxDB guarda las horas en **UTC**. Colombia está en UTC−5: las 15:00 UTC son las 10:00 a. m. en Colombia.
-
-**✅ Checklist Fase 1**
-- [ ] La sección 5 muestra el MAE de tu SARIMA y el de la línea base ingenua (si tu SARIMA no gana, no pasa nada).
-- [ ] La verificación de la sección 6 dice `Diferencia máxima API vs. modelo original: 0.0`.
-- [ ] `models/sarima_config.json` y el notebook ejecutado están en tu repo.
-
----
-
-## Fase 2 — Tu frontend
-
-`frontend/index.html` es un **esqueleto**: pide el pronóstico a la API y lo muestra en una tabla sin formato. Conviértelo en una interfaz que alguien quiera usar.
-
-### Trabajar sin modelo todavía
-
-Si tu modelo aún no está listo, usa el modo demo con datos sintéticos:
-
-```bash
-python scripts/crear_modelo_demo.py
-DEMO_MODE=true uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Abre el puerto 8000 (pestaña **Puertos** → 🌐). Con `--reload`, cada vez que guardas un cambio basta con recargar la página.
-
-> El modelo demo se guarda en `models/sarima_config.json`. **No lo subas a GitHub**: reemplázalo por tu modelo real de la Fase 1.
-
-### Requisitos mínimos
-
-1. **Una gráfica** con el histórico, el pronóstico y el intervalo de confianza.
-2. **Las horas en hora de Colombia.** La API las entrega en UTC (terminan en `Z`).
-3. **Al menos un indicador destacado:** valor de la próxima hora, máximo esperado, hora del último dato…
-4. **Controles** para elegir cuántas horas pronosticar.
-5. **Un mensaje claro** cuando la API responde con error.
-
-El diseño es libre. Puedes cargar cualquier librería de gráficas desde un CDN (Chart.js, Plotly, ECharts…) y poner archivos `.css` o `.js` en la carpeta `frontend/`: se sirven en `/static/<nombre>`.
-
-### Lo que entrega la API
-
-Pruébalo en `/docs` o en el archivo `pruebas.http`. El endpoint principal:
-
-`GET /api/prediccion?horas=12&historia=48&confianza=0.95`
-
-```json
-{
-  "ultima_observacion": "2026-10-27T15:00:00Z",
-  "horas_contexto_usadas": 336,
-  "horas_rellenadas": 0,
-  "confianza": 0.95,
-  "historico": [
-    {"tiempo": "2026-10-27T15:00:00Z", "valor": 177.56}
-  ],
-  "prediccion": [
-    {"tiempo": "2026-10-27T16:00:00Z", "prediccion": 266.94,
-     "limite_inferior": 143.34, "limite_superior": 390.54}
-  ]
-}
-```
-
-| Endpoint | Para qué sirve |
+| Variable | Descripción |
 |---|---|
-| `GET /api/prediccion` | Pronóstico + intervalo + histórico para graficar |
-| `GET /api/historico?horas=48` | Solo el histórico |
-| `GET /api/modelo` | Órdenes del SARIMA, métricas y fecha de entrenamiento |
-| `GET /api/salud` | Estado del servicio y `atendido_por` (lo usarás en la Fase 4) |
+| `INFLUX_URL` | URL del servidor InfluxDB |
+| `INFLUX_TOKEN` | Token de acceso (secreto) |
+| `INFLUX_ORG` | Organización |
+| `INFLUX_BUCKET` | Bucket de datos |
+| `INFLUX_MEASUREMENT` | `Server` |
+| `INFLUX_FIELD` | `Consumo_total` |
 
-`horas_rellenadas` cuenta las horas sin dato que la API rellenó (por interpolación o con el valor vecino). Si es alto, el sensor estuvo caído y el pronóstico es menos confiable: es un buen dato para mostrar en tu frontend.
+En GitHub Codespaces: **Settings → Secrets and variables → Codespaces**. La configuración del measurement y field también puede recuperarse de `models/sarima_config.json` cuando se inicia la API.
 
-Si la respuesta no es exitosa, el mensaje de error viene en el campo `detail`.
-
-**✅ Checklist Fase 2**
-- [ ] Se cumplen los 5 requisitos mínimos.
-- [ ] Tu `frontend/index.html` está en tu repo.
-
----
-
-## Fase 3 — El servicio completo en Codespaces (sin Docker)
-
-Con tu modelo real en `models/` y tu frontend terminado:
+Para comprobar la conexión sin revelar el token:
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+INFLUX_MEASUREMENT=Server INFLUX_FIELD=Consumo_total python scripts/probar_conexion.py
 ```
 
-Sin `DEMO_MODE`: ahora los datos vienen de InfluxDB. Abre el puerto 8000 y revisa que todo funcione. Visita también `/api/salud` y **anota el valor de `atendido_por`**.
+## Ejecutar la aplicación sin Docker
 
-Detén la API con **Ctrl + C**.
-
-**✅ Checklist Fase 3**
-- [ ] Tu frontend muestra el pronóstico con datos reales.
-- [ ] `/api/salud` muestra `"modelo_cargado": true` e `"influx_configurado": true`.
-- [ ] `/api/salud` muestra `"modelo_demo": false` (no estás usando el modelo de prueba).
-
----
-
-## Fase 4 — Tu contenedor
-
-Ahora empaquetas el servicio en una imagen Docker que pueda correr en cualquier máquina.
-
-### 4.1 Escribe el `Dockerfile`
-
-Crea un archivo llamado `Dockerfile`, sin extensión, **en la raíz del repositorio**. Debe hacer esto, en este orden:
-
-1. Partir de una **imagen base** oficial de Python 3.12 en su versión liviana (`slim`).
-2. Definir `/app` como **carpeta de trabajo**.
-3. Copiar **solo** `requirements.txt` e **instalar las dependencias** con `pip`, sin guardar caché.
-4. Copiar las carpetas que necesita la app: `app/`, `frontend/` y `models/`.
-5. **Exponer** el puerto 8000.
-6. Definir el **comando de arranque**: `uvicorn` sirviendo `app.main:app` en el host `0.0.0.0` y el puerto `8000`.
-
-Antes de escribirlo, piensa en estas dos preguntas:
-- ¿Por qué se copia `requirements.txt` **antes** que el resto del código?
-- ¿Por qué el host debe ser `0.0.0.0` y no `127.0.0.1` dentro de un contenedor?
-
-### 4.2 Escribe el `.dockerignore`
-
-Crea `.dockerignore` en la raíz. Su trabajo es impedir que entren a la imagen archivos que no deben estar ahí. Como mínimo, el `.env` (credenciales), la carpeta `.git`, los notebooks y las cachés de Python (`__pycache__`).
-
-> **Pruébalo:** tu Dockerfile copia carpeta por carpeta, así que el `.env` no entraría aunque no tuvieras `.dockerignore`. Cambia temporalmente los `COPY` por un solo `COPY . .`, construye y ejecuta `docker run --rm pronostico ls -a /app` con y sin `.dockerignore`. ¿Qué cambia?
-
-### 4.3 Construye la imagen
+Desde la raíz del repositorio, con las dependencias instaladas y las variables de InfluxDB configuradas:
 
 ```bash
-docker build -t pronostico .
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-La primera vez tarda 1–3 minutos. Si cambias solo el frontend y vuelves a construir, debe tardar segundos. Fíjate en cuáles pasos dicen `CACHED`.
+Abre el puerto **8000** desde GitHub Codespaces. La página principal (`/`) muestra el dashboard. Para consultar el estado utiliza `/api/salud`.
 
-### 4.4 Ejecuta el contenedor
+Detén Uvicorn con `Ctrl + C` antes de usar el mismo puerto con Docker.
+
+## Ejecutar la aplicación con Docker
+
+### Construir la imagen
 
 ```bash
-docker run --rm -p 8000:8000 \
-  -e INFLUX_URL -e INFLUX_TOKEN -e INFLUX_ORG -e INFLUX_BUCKET \
-  pronostico
+docker build -t pronostico:1.0 .
 ```
 
-- `-p 8000:8000` conecta el puerto del contenedor con el del Codespace. Sin esto, la app corre pero nadie la ve.
-- `-e INFLUX_TOKEN`, sin valor, copia al contenedor la variable que ya existe en tu Codespace. **Las credenciales se entregan al ejecutar la imagen, nunca dentro de ella.**
+### Iniciar el contenedor
 
-Abre el puerto 8000: debe verse exactamente igual que en la Fase 3.
+Las cuatro variables de conexión deben existir previamente en el entorno desde el cual se ejecuta el comando. Se pasan sus valores al contenedor sin escribirlos en la terminal:
 
-### 4.5 La evidencia
+```bash
+docker run -d \
+  --name pronostico \
+  -p 8000:8000 \
+  -e INFLUX_URL \
+  -e INFLUX_TOKEN \
+  -e INFLUX_ORG \
+  -e INFLUX_BUCKET \
+  -e INFLUX_MEASUREMENT=Server \
+  -e INFLUX_FIELD=Consumo_total \
+  -e DEMO_MODE=false \
+  pronostico:1.0
+```
 
-En otra terminal (botón **+**):
+Si ya existe un contenedor llamado `pronostico`, deténlo y elimínalo antes de crear uno nuevo:
+
+```bash
+docker stop pronostico
+docker rm pronostico
+```
+
+### Verificar la ejecución
 
 ```bash
 docker ps
+docker logs --tail 30 pronostico
 ```
 
-Compara el **CONTAINER ID** con el campo `atendido_por` de `/api/salud`. Deben ser **iguales**, y distintos del valor que anotaste en la Fase 3: quien responde ahora es el contenedor, no el Codespace.
+Al abrir `/api/salud`, se comprobó que la API devuelve `estado: ok`, `influx_configurado: true`, `modelo_cargado: true`, `modo_demo: false` y `modelo_demo: false`. El campo `atendido_por` coincidió con el **CONTAINER ID** mostrado en `docker ps`, confirmando la ejecución desde el contenedor.
 
-Verifica también que tu imagen **no contiene credenciales**. Estos dos comandos no deben mostrar ni el token ni un archivo `.env`:
+También se comprobó que los pronósticos de **12 y 24 horas** respondieron con HTTP `200 OK` dentro de Docker.
 
-```bash
-docker run --rm pronostico env | grep -i influx
-docker run --rm pronostico ls -a /app
-```
+### Exclusión de archivos sensibles
 
-Sube tus archivos:
+El archivo `.dockerignore` excluye credenciales (`.env`), historial Git, notebooks y archivos de caché. Se realizó una prueba comparativa con un contexto ficticio: con `.dockerignore` esos archivos no aparecieron en la imagen de prueba; sin él, sí aparecieron. Se comprobó además que la imagen principal no incorporaba variables InfluxDB al ejecutar una inspección sin pasarle credenciales.
 
-```bash
-git add Dockerfile .dockerignore
-git commit -m "Contenerización del servicio"
-git push
-```
+## Endpoints de la API
 
-**✅ Checklist Fase 4**
-- [ ] `docker build` termina sin errores.
-- [ ] La app funciona desde el contenedor en el puerto 8000.
-- [ ] `atendido_por` coincide con el CONTAINER ID de `docker ps`.
-- [ ] La imagen no contiene el token ni el `.env`.
-- [ ] `Dockerfile` y `.dockerignore` están en tu repo.
-
----
-
-## Entregables
-
-En tu repositorio de GitHub:
-
-1. `models/sarima_config.json`: tu modelo.
-2. `notebooks/entrenamiento_sarima_colab.ipynb`: ejecutado completo.
-3. `frontend/index.html`, y tus archivos `.css` o `.js` si los usaste.
-4. `Dockerfile` y `.dockerignore`.
-5. Una sección **Video** al inicio de este README con el enlace a tu video.
-
-### El video (máximo 5 minutos)
-
-Reemplaza la sustentación en vivo. Muestra tu app funcionando de las dos formas:
-
-1. **Sin Docker:** ejecuta `uvicorn app.main:app --host 0.0.0.0 --port 8000`, abre tu frontend con datos reales, cambia las horas a pronosticar y abre `/api/salud` (debe decir `"modelo_demo": false`).
-2. **Con Docker:** ejecuta `docker build` y `docker run` con los `-e`, abre tu frontend, y muestra `docker ps` junto a `/api/salud`: el CONTAINER ID debe coincidir con `atendido_por`.
-
-Reglas: nunca muestres el token; la terminal y el navegador deben leerse bien; súbelo a YouTube como *no listado* o a Google Drive con acceso para el profesor.
-
-> ⚠️ Si tu token aparece en el repositorio, en el historial de commits, dentro de la imagen o en el video, se descuenta de la nota.
-
----
-
-## Problemas frecuentes
-
-| Síntoma | Causa / solución |
+| Ruta | Función |
 |---|---|
-| La terminal dice *recovery mode* | `F1` → *Codespaces: View Creation Log*, busca `error`. Avisa al profesor. |
-| `echo ${#INFLUX_TOKEN}` da `0` | El Codespace no tomó los secrets: `F1` → *Codespaces: Rebuild Container*. |
-| `Faltan variables de InfluxDB…` | Faltan secrets, o en `docker run` faltan los `-e`. |
-| `(401) unauthorized` | Token mal copiado: revisa que esté completo, sin espacios. |
-| `InfluxDB no devolvió datos…` | Measurement o field mal escritos. Usa `scripts/probar_conexion.py`. |
-| `No hay modelo cargado` | Falta `models/sarima_config.json`. En Docker: vuelve a construir la imagen después de agregarlo. |
-| En Colab: `No module named 'influxdb_client'` | No ejecutaste la celda `!pip install`. Ejecútala y repite. |
-| En Colab: la serie sale constante | Ejecutaste las celdas fuera de orden. *Entorno de ejecución → Reiniciar y ejecutar todo.* |
-| Tu frontend muestra horas 5 h adelantadas | Estás mostrando la hora UTC sin convertir. |
-| `address already in use` en el puerto 8000 | Quedó corriendo uvicorn o un contenedor. Ctrl + C, o `docker ps` y `docker stop <id>`. |
-| La app corre en Docker pero no abre | Falta `-p 8000:8000`, o el comando de arranque usa `127.0.0.1` en vez de `0.0.0.0`. |
-| `docker build`: *failed to compute cache key… not found* | Un `COPY` apunta a una carpeta que no existe, o el `.dockerignore` la está excluyendo. |
-| `ModuleNotFoundError: No module named 'app'` en el contenedor | No copiaste la carpeta `app/`, o el comando de arranque no es `app.main:app`. |
+| `/` | Dashboard web |
+| `/docs` | Documentación interactiva de FastAPI |
+| `GET /api/salud` | Estado del servicio y del modelo |
+| `GET /api/historico?horas=48` | Últimas observaciones históricas |
+| `GET /api/prediccion?horas=24&historia=48&confianza=0.95` | Pronóstico e intervalo de confianza |
+| `GET /api/modelo` | Información y métricas del modelo exportado |
 
-## Al terminar cada sesión
+## Entregables y estado
 
-Detén la API con **Ctrl + C**. El Codespace se detiene solo tras 30 minutos sin actividad. Tu cuota gratuita es de **60 horas al mes** con la máquina de 2 núcleos. Revisa tu consumo en **github.com/settings/billing → Usage**, filtrando por Codespaces.
+- [x] Modelo propio exportado en `models/sarima_config.json`.
+- [x] Notebook de entrenamiento ejecutado y guardado en `notebooks/`.
+- [x] Verificación del modelo reconstruido con diferencia máxima `0.0`.
+- [x] Dashboard desarrollado en `frontend/index.html`.
+- [x] Ejecución de FastAPI en Codespaces sin Docker.
+- [x] `Dockerfile` y `.dockerignore` incluidos.
+- [x] Imagen Docker construida y contenedor probado con datos reales.
+- [x] Coincidencia de `atendido_por` con el ID del contenedor.
+- [x] Video de sustentación enlazado al inicio de este README.
+
+## Nota de seguridad
+
+El token de InfluxDB no debe publicarse en código, archivos `.env`, historial de Git, imágenes Docker ni grabaciones. El repositorio utiliza configuración por variables de entorno para evitar incluir las credenciales en los archivos del proyecto.
+
+---
+
+**Proyecto final · Computación Avanzada · Institución Universitaria Pascual Bravo · 2026**
